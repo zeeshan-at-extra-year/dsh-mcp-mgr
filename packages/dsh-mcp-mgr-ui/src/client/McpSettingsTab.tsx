@@ -35,6 +35,8 @@ export interface McpSettingsTabInjected {
   setServerEnabled: (workspace: string, name: string, enabled: boolean) => Promise<McpApplyResult>
   /** Toggle strict mode host-side; resolves with the post-change snapshot. */
   setStrictMode: (enabled: boolean) => Promise<McpManagerSnapshot>
+  /** Change the relative path of the mcp.json file inside each workspace. */
+  setMcpJsonRelPath: (relPath: string) => Promise<McpManagerSnapshot>
   /** Self-update check result (startup npm lookup). */
   versionInfo: () => Promise<McpPluginVersionInfo>
   /** Registered workspaces for the add-form target picker. */
@@ -90,7 +92,7 @@ function shortPath(path: string, forceLastTwo = false): string {
 
 /** Render the currently registered MCP servers (workspace + profile sources). */
 export function McpSettingsTab({
-  snapshot, apply, removeServer, setServerEnabled, setStrictMode, versionInfo, listWorkspaces, currentWorkspacePath, t,
+  snapshot, apply, removeServer, setServerEnabled, setStrictMode, setMcpJsonRelPath, versionInfo, listWorkspaces, currentWorkspacePath, t,
 }: McpSettingsTabProps): ReactNode {
   const [request, setRequest] = useState(0)
   const [state, setState] = useState<ViewState>({ status: 'loading' })
@@ -100,6 +102,8 @@ export function McpSettingsTab({
   const [updateInfo, setUpdateInfo] = useState<McpPluginVersionInfo | null>(null)
   const [strictMode, setStrictModeState] = useState<boolean>(() => loadStrictMode() ?? false)
   const [showForm, setShowForm] = useState(false)
+  const [pathInput, setPathInput] = useState('')
+  const [pathSaving, setPathSaving] = useState(false)
 
   useEffect(() => {
     let current = true
@@ -113,7 +117,7 @@ export function McpSettingsTab({
   useEffect(() => {
     let current = true
     void Promise.resolve().then(() => snapshot()).then(
-      (value) => { if (current) { setState({ status: 'ready', snapshot: value }); setErrorDetail(null) } },
+      (value) => { if (current) { setState({ status: 'ready', snapshot: value }); setPathInput(value.mcpJsonRelPath); setErrorDetail(null) } },
       (error) => {
         if (current) {
           setState({ status: 'error' })
@@ -207,6 +211,26 @@ export function McpSettingsTab({
     }
   }
 
+  const onSavePath = async (): Promise<void> => {
+    const trimmed = pathInput.trim()
+    if (trimmed.length === 0) return
+    setPathSaving(true)
+    setNotice(null)
+    try {
+      const snap = await setMcpJsonRelPath(trimmed)
+      setState({ status: 'ready', snapshot: snap })
+      setPathInput(snap.mcpJsonRelPath)
+      setNotice(t('mcpJsonPathSaved'))
+    } catch (error) {
+      setNotice(`${t('applyFailed')}: ${String(error instanceof Error ? error.message : error)}`)
+    } finally {
+      setPathSaving(false)
+    }
+  }
+
+  const currentRelPath = state.status === 'ready' ? state.snapshot.mcpJsonRelPath : ''
+  const pathDirty = pathInput.trim() !== '' && pathInput.trim() !== currentRelPath
+
   return (
     <div className={css.section} aria-busy={state.status === 'loading'}>
       {/* Transient result feedback: floats over the viewport, never pushes the table. */}
@@ -221,6 +245,27 @@ export function McpSettingsTab({
           {t('updateAvailableLink')}
         </div>
       ) : null}
+      {/* Config file path: editable relative path of the mcp.json inside each workspace. */}
+      <div className={css.pathRow}>
+        <label className={css.pathLabel} title={t('mcpJsonPathHint')}>
+          {t('mcpJsonPathLabel')}
+        </label>
+        <input
+          type="text"
+          className={css.pathInput}
+          value={pathInput}
+          placeholder={currentRelPath}
+          onChange={(event) => { setPathInput(event.target.value) }}
+        />
+        <button
+          type="button"
+          className={css.refresh}
+          disabled={!pathDirty || pathSaving}
+          onClick={() => { void onSavePath() }}
+        >
+          {t('mcpJsonPathSave')}
+        </button>
+      </div>
       <div className={css.heading}>
         <h3>{t('server')}</h3>
         <div className={css.headingActions}>

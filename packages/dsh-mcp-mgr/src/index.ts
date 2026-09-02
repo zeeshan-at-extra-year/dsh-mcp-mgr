@@ -19,7 +19,7 @@ import { randomUUID } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import Schema from '@deepseek-ai/schemastery'
 import { collectWorkspaces, hasManagerFile } from './discovery.ts'
-import { draftToEntry, mcpJsonPath, parseMcpJson, SERVER_NAME_PATTERN, validateDraft, type ParsedServer } from './parse.ts'
+import { DEFAULT_MCP_JSON_REL_PATH, draftToEntry, mcpJsonPath, parseMcpJson, SERVER_NAME_PATTERN, validateDraft, type ParsedServer } from './parse.ts'
 import { profileServerNames, scanProfileEntries, type LoaderEntryView } from './profile.ts'
 import { McpSync } from './sync.ts'
 import { createFileWatcher } from './watch.ts'
@@ -27,7 +27,7 @@ import { checkPluginVersion } from './version.ts'
 import type { McpApplyResult, McpManagerSnapshot, McpPluginVersionInfo, McpServerDraft, McpServerState } from './types.ts'
 
 export type * from './types.ts'
-export { parseMcpJson, mcpJsonPath, expandEnv } from './parse.ts'
+export { parseMcpJson, mcpJsonPath, expandEnv, DEFAULT_MCP_JSON_REL_PATH } from './parse.ts'
 export { McpSync } from './sync.ts'
 export type { McpInstance, InstanceFactory } from './sync.ts'
 
@@ -46,11 +46,14 @@ export interface Config {
   enabled: boolean
   /** Periodic rescan interval covering workspaces added at runtime. */
   rescanIntervalMs: number
+  /** Relative path of the mcp.json file inside each workspace directory. */
+  mcpJsonRelPath: string
 }
 
 export const Config: Schema<Config> = Schema.object({
   enabled: Schema.boolean().default(true),
   rescanIntervalMs: Schema.number().min(1000).max(3600_000).default(10_000),
+  mcpJsonRelPath: Schema.string().default(DEFAULT_MCP_JSON_REL_PATH),
 })
 
 /** mcp-client plugin object passed to `ctx.plugin` per server. */
@@ -76,6 +79,7 @@ export class McpMgrGateway extends TypertRemoteService {
   private readonly workspaceSet = new Set<string>()
   /** Startup npm update check (fires once; never rejects). */
   private readonly versionCheck: Promise<McpPluginVersionInfo>
+  private mcpJsonRelPath: string
   private profileServers: readonly McpServerState[] = []
   private rescanning = false
   /** Strict mode: only {@link activeWorkspace}'s servers are mounted. */
@@ -89,6 +93,7 @@ export class McpMgrGateway extends TypertRemoteService {
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'mcpMgr')
+    this.mcpJsonRelPath = config.mcpJsonRelPath
     this.sync = new McpSync(
       {
         create: async config => {
@@ -159,6 +164,7 @@ export class McpMgrGateway extends TypertRemoteService {
       watchedWorkspaces: [...this.workspaceSet].sort(),
       strictMode: this.strictMode,
       activeWorkspace: this.activeWorkspace,
+      mcpJsonRelPath: this.mcpJsonRelPath,
     }
   }
 
@@ -191,6 +197,24 @@ export class McpMgrGateway extends TypertRemoteService {
   }
 
   /**
+   * Change the relative path of the mcp.json file inside each workspace.
+   * Triggers a full rescan so existing servers are unloaded and the new path
+   * is picked up immediately.
+   * @param relPath - new relative path (e.g. `.mcp.json` or `.dsh/dshmm/mcp.json`).
+   * @returns the post-rescan snapshot.
+   */
+  @Remote('setMcpJsonRelPath')
+  async setMcpJsonRelPath(relPath: string): Promise<McpManagerSnapshot> {
+    if (typeof relPath !== 'string' || relPath.trim().length === 0) {
+      throw new Error('mcpJsonRelPath must be a non-empty string')
+    }
+    this.mcpJsonRelPath = relPath.trim()
+    this.parseCache.clear()
+    await this.runRescan()
+    return this.snapshot()
+  }
+
+  /**
    * Create one server entry in a workspace's mcp.json (file created when
    * absent). Resolves only after the resync settles, so a caller's follow-up
    * snapshot already reflects the mounted state.
@@ -203,7 +227,7 @@ export class McpMgrGateway extends TypertRemoteService {
     if (workspacePath === undefined) return { ok: false, error: `workspace is not registered: ${draft.workspace}` }
     const release = await this.acquireMutation(workspacePath)
     try {
-      const path = mcpJsonPath(workspacePath)
+      const path = mcpJsonPath(workspacePath, this.mcpJsonRelPath)
     let document: { mcpServers?: Record<string, unknown> }
     try {
       document = JSON.parse(readFileSync(path, 'utf8')) as { mcpServers?: Record<string, unknown> }
@@ -257,8 +281,8 @@ export class McpMgrGateway extends TypertRemoteService {
     if (workspacePath === undefined) return { ok: false, error: `workspace is not registered: ${workspace}` }
     const release = await this.acquireMutation(workspacePath)
     try {
-      const path = mcpJsonPath(workspacePath)
-      if (!hasManagerFile(workspacePath)) {
+      const path = mcpJsonPath(workspacePath, this.mcpJsonRelPath)
+      if (!hasManagerFile(workspacePath, this.mcpJsonRelPath)) {
         return { ok: false, error: `no mcp.json under ${workspacePath}` }
       }
     try {
@@ -298,8 +322,8 @@ export class McpMgrGateway extends TypertRemoteService {
     if (workspacePath === undefined) return { ok: false, error: `workspace is not registered: ${workspace}` }
     const release = await this.acquireMutation(workspacePath)
     try {
-      const path = mcpJsonPath(workspacePath)
-      if (!hasManagerFile(workspacePath)) {
+      const path = mcpJsonPath(workspacePath, this.mcpJsonRelPath)
+      if (!hasManagerFile(workspacePath, this.mcpJsonRelPath)) {
         return { ok: false, error: `no mcp.json under ${workspacePath}` }
       }
     try {
@@ -381,14 +405,14 @@ export class McpMgrGateway extends TypertRemoteService {
       }
       const watchFiles: string[] = []
       for (const workspace of workspaces) {
-        if (!hasManagerFile(workspace.path)) {
+        if (!hasManagerFile(workspace.path, this.mcpJsonRelPath)) {
           // A deleted mcp.json is an empty desired state, not an absent pass.
           // Reconcile it immediately so the old MCP fiber and tools unload.
           this.parseCache.delete(workspace.path)
           await this.sync.syncWorkspace({ workspacePath: workspace.path, servers: [] })
           continue
         }
-        watchFiles.push(mcpJsonPath(workspace.path))
+        watchFiles.push(mcpJsonPath(workspace.path, this.mcpJsonRelPath))
         const cached = this.parseCache.get(workspace.path)
         if (cached !== undefined) continue
         this.parseCache.set(workspace.path, this.readWorkspace(workspace.path))
@@ -440,7 +464,7 @@ export class McpMgrGateway extends TypertRemoteService {
   }
 
   private readWorkspace(workspacePath: string): readonly ParsedServer[] {
-    const path = mcpJsonPath(workspacePath)
+    const path = mcpJsonPath(workspacePath, this.mcpJsonRelPath)
     try {
       const parsed = parseMcpJson(readFileSync(path, 'utf8'), workspacePath)
       for (const error of parsed.errors) {

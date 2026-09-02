@@ -34,9 +34,12 @@ export const SERVER_NAME_PATTERN = /^[A-Za-z0-9_-]{1,32}$/
 /** Whole-string `${VAR}` env expansion. */
 const ENV_REF_PATTERN = /^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$/
 
+/** Default relative path of the manager file inside a workspace. */
+export const DEFAULT_MCP_JSON_REL_PATH = join('.dsh', 'dshmm', 'mcp.json')
+
 /** Path of the manager file inside a workspace. */
-export function mcpJsonPath(workspacePath: string): string {
-  return join(workspacePath, '.dsh', 'dshmm', 'mcp.json')
+export function mcpJsonPath(workspacePath: string, relPath: string = DEFAULT_MCP_JSON_REL_PATH): string {
+  return join(workspacePath, relPath)
 }
 
 /**

@@ -21,6 +21,30 @@
   color: #2e6b9e;
 }
 
+/* Config file path row: label + input + apply button. */
+.pathRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pathLabel {
+  font-size: 0.9em;
+  white-space: nowrap;
+}
+
+.pathInput {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
 .heading {
   display: flex;
   align-items: center;
@@ -212,3 +236,4 @@
   opacity: 0.5;
   cursor: default;
 }
+

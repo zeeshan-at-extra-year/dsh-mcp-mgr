@@ -8,7 +8,7 @@ export const zh = {
   loading: '正在读取 MCP 服务…',
   error: '暂时无法读取 MCP 服务。',
   retry: '重试',
-  empty: '暂无 MCP 服务。在工作区的 .dsh/dshmm/mcp.json 或 profile 配置中声明。',
+  empty: '暂无 MCP 服务。在工作区的配置文件路径或 profile 配置中声明。',
   source: '来源',
   server: '服务',
   transport: '传输',
@@ -62,6 +62,10 @@ export const zh = {
   addedStrict: '已写入 mcp.json；严格模式下需切换到该工作区才挂载',
   updateAvailable: '插件有新版本可用，点击',
   updateAvailableLink: '查看升级方式',
+  mcpJsonPathLabel: '配置文件路径',
+  mcpJsonPathHint: '工作区内 mcp.json 的相对路径',
+  mcpJsonPathSave: '应用',
+  mcpJsonPathSaved: '配置文件路径已更新',
 } satisfies Record<string, string>
 
 /** MCP manager locale key union. */
@@ -80,7 +84,7 @@ export const en: Record<McpLocaleKey, string> = {
   loading: 'Loading MCP servers…',
   error: 'Unable to load MCP servers.',
   retry: 'Retry',
-  empty: 'No MCP servers. Declare them in a workspace\'s .dsh/dshmm/mcp.json or the profile config.',
+  empty: 'No MCP servers. Declare them in the configured path inside a workspace, or the profile config.',
   source: 'Source',
   server: 'Server',
   transport: 'Transport',
@@ -134,4 +138,8 @@ export const en: Record<McpLocaleKey, string> = {
   addedStrict: 'Written to mcp.json; strict mode mounts it once this workspace is active',
   updateAvailable: 'A new plugin version is available. Click',
   updateAvailableLink: 'to see how to upgrade.',
+  mcpJsonPathLabel: 'Config file path',
+  mcpJsonPathHint: 'Relative path of the mcp.json inside each workspace',
+  mcpJsonPathSave: 'Apply',
+  mcpJsonPathSaved: 'Config file path updated',
 }

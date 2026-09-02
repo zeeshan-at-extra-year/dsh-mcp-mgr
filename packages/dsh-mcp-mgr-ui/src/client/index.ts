@@ -35,6 +35,7 @@ interface McpMgrNamespace {
   setServerEnabled(workspace: string, name: string, enabled: boolean): Promise<RemoteResult<McpApplyResult>>
   setStrictMode(enabled: boolean): Promise<RemoteResult<McpManagerSnapshot>>
   setActiveWorkspace(path: string): Promise<RemoteResult<McpManagerSnapshot>>
+  setMcpJsonRelPath(relPath: string): Promise<RemoteResult<McpManagerSnapshot>>
   versionInfo(): Promise<RemoteResult<McpPluginVersionInfo>>
 }
 
@@ -141,6 +142,13 @@ export async function apply(ctx: ClientContext): Promise<void> {
       return result.value
     },
     setStrictMode,
+    setMcpJsonRelPath: async (relPath) => {
+      const result = await mcpMgr().setMcpJsonRelPath(relPath)
+      if (!result.ok) {
+        throw new Error(`mcpMgr.setMcpJsonRelPath failed: ${result.error.code}: ${result.error.message}`)
+      }
+      return result.value
+    },
     versionInfo: async () => {
       const result = await mcpMgr().versionInfo()
       if (!result.ok) {

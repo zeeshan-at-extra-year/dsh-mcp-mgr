@@ -5,3 +5,4 @@ node_modules/
 spike/
 .dsh/
 .DS_Store
+.pnpm-store/

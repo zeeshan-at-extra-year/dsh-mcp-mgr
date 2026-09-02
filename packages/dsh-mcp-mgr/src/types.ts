@@ -64,6 +64,8 @@ export interface McpManagerSnapshot {
   readonly strictMode: boolean
   /** Strict-mode target: the workspace the web client currently has selected ('' when none). */
   readonly activeWorkspace: string
+  /** Relative path of the mcp.json file inside each workspace directory. */
+  readonly mcpJsonRelPath: string
 }
 
 /** One server entry for create/update through the Remote. */

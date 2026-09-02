@@ -47,6 +47,6 @@ export function collectWorkspaces(ctx: unknown): WorkspaceSource[] {
 }
 
 /** Whether a workspace currently carries a readable manager file. */
-export function hasManagerFile(workspacePath: string): boolean {
-  return existsSync(mcpJsonPath(workspacePath))
+export function hasManagerFile(workspacePath: string, mcpJsonRelPath?: string): boolean {
+  return existsSync(mcpJsonPath(workspacePath, mcpJsonRelPath))
 }
