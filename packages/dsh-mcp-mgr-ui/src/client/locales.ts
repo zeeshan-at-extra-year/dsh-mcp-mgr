@@ -66,6 +66,13 @@ export const zh = {
   mcpJsonPathHint: '工作区内 mcp.json 的相对路径',
   mcpJsonPathSave: '应用',
   mcpJsonPathSaved: '配置文件路径已更新',
+  detailSource: '来源',
+  detailSourceWorkspace: '工作区',
+  detailSourceProfile: 'Profile 配置',
+  detailWorkspace: '工作区路径',
+  detailSourceFile: '配置文件',
+  detailError: '错误',
+  detailProbeError: '探测错误',
 } satisfies Record<string, string>
 
 /** MCP manager locale key union. */
@@ -142,4 +149,11 @@ export const en: Record<McpLocaleKey, string> = {
   mcpJsonPathHint: 'Relative path of the mcp.json inside each workspace',
   mcpJsonPathSave: 'Apply',
   mcpJsonPathSaved: 'Config file path updated',
+  detailSource: 'Source',
+  detailSourceWorkspace: 'Workspace',
+  detailSourceProfile: 'Profile config',
+  detailWorkspace: 'Workspace',
+  detailSourceFile: 'Config file',
+  detailError: 'Error',
+  detailProbeError: 'Probe error',
 }

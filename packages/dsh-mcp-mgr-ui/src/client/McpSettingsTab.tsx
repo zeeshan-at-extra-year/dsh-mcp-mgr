@@ -79,17 +79,6 @@ function displayStatus(server: McpServerState): DisplayStatus {
     : server.status
 }
 
-/**
- * Short display form of a source path: last path segment by default, last two
- * when `forceLastTwo` (used for profile config files and colliding basenames).
- */
-function shortPath(path: string, forceLastTwo = false): string {
-  const parts = path.split(/[\\/]/).filter(Boolean)
-  if (parts.length === 0) return path
-  const count = forceLastTwo && parts.length > 2 ? 2 : 1
-  return parts.slice(-count).join('/')
-}
-
 /** Render the currently registered MCP servers (workspace + profile sources). */
 export function McpSettingsTab({
   snapshot, apply, removeServer, setServerEnabled, setStrictMode, setMcpJsonRelPath, versionInfo, listWorkspaces, currentWorkspacePath, t,
@@ -104,6 +93,7 @@ export function McpSettingsTab({
   const [showForm, setShowForm] = useState(false)
   const [pathInput, setPathInput] = useState('')
   const [pathSaving, setPathSaving] = useState(false)
+  const [expanded, setExpanded] = useState<string | null>(null)
 
   useEffect(() => {
     let current = true
@@ -133,22 +123,6 @@ export function McpSettingsTab({
     [state],
   )
 
-  /** Source-cell display paths with basename collisions widened to two segments. */
-  const sourceDisplay = useMemo(() => {
-    const workspaceBasenames = new Map<string, number>()
-    for (const server of servers) {
-      if (server.source !== 'workspace' || server.workspace === undefined) continue
-      const base = shortPath(server.workspace)
-      workspaceBasenames.set(base, (workspaceBasenames.get(base) ?? 0) + 1)
-    }
-    return new Map(servers.map(server => [
-      server.key,
-      server.source === 'workspace' && server.workspace !== undefined
-        ? shortPath(server.workspace, (workspaceBasenames.get(shortPath(server.workspace)) ?? 0) > 1)
-        : shortPath(server.sourceFile ?? server.key, true),
-    ]))
-  }, [servers])
-
   const retry = (): void => {
     setNotice(null)
     setState({ status: 'loading' })
@@ -168,6 +142,7 @@ export function McpSettingsTab({
       return
     }
     setBusy(null)
+    setExpanded(null)
     setState({ status: 'loading' })
     setRequest(value => value + 1)
     setNotice(result.ok ? t('removed') : `${t('applyFailed')}: ${result.error}`)
@@ -233,9 +208,7 @@ export function McpSettingsTab({
 
   return (
     <div className={css.section} aria-busy={state.status === 'loading'}>
-      {/* Transient result feedback: floats over the viewport, never pushes the table. */}
       {notice !== null ? <Toast text={notice} onDone={() => { setNotice(null) }} /> : null}
-      {/* Startup npm update check: banner only when an upgrade is available. */}
       {updateInfo?.updateAvailable === true ? (
         <div className={css.update} role="status">
           {t('updateAvailable')}
@@ -245,7 +218,6 @@ export function McpSettingsTab({
           {t('updateAvailableLink')}
         </div>
       ) : null}
-      {/* Config file path: editable relative path of the mcp.json inside each workspace. */}
       <div className={css.pathRow}>
         <label className={css.pathLabel} title={t('mcpJsonPathHint')}>
           {t('mcpJsonPathLabel')}
@@ -314,78 +286,129 @@ export function McpSettingsTab({
         <table className={css.table}>
           <thead>
             <tr>
-              <th>{t('source')}</th>
               <th>{t('server')}</th>
               <th>{t('transport')}</th>
               <th>{t('status')}</th>
-              <th>{t('action')}</th>
             </tr>
           </thead>
           <tbody>
             {servers.map((server) => {
+              const status = displayStatus(server)
+              const isExpanded = expanded === server.key
               const fullPath = server.source === 'workspace' ? server.workspace : server.sourceFile
               return (
-                <tr key={server.key} data-source={server.source}>
-                  <td className={css.sourceCell}>
-                    {fullPath !== undefined
-                      ? <span className={css.sourcePath} title={fullPath}>{sourceDisplay.get(server.key)}</span>
-                      : null}
-                  </td>
-                  <td className={css.nowrapCell} title={server.name}>{server.name}</td>
-                  <td className={css.nowrapCell} title={server.transport}>{server.transport}</td>
-                  <td className={css.nowrapCell}>
-                    {(() => {
-                      const status = displayStatus(server)
-                      return (
-                        <>
-                          <span
-                            className={css.statusBadge}
-                            data-status={status}
-                            title={
-                              status === 'connected' ? t('connectedHint')
-                                : status === 'registered' ? t('activeHint')
-                                : undefined
-                            }
-                          >
-                            {t(DISPLAY_KEYS[status])}
-                          </span>
-                          {server.error !== undefined
-                            ? <span className={css.errorText} title={server.error}>{server.error}</span>
-                            : status === 'registered' && server.probeError !== undefined
-                              ? <span className={css.errorText} title={server.probeError}>{server.probeError}</span>
-                              : null}
-                        </>
-                      )
-                    })()}
-                  </td>
-                  <td className={css.nowrapCell}>
-                    {server.source === 'workspace' ? (
-                      <>
-                        <button
-                          type="button"
-                          className={css.toggle}
-                          disabled={busy === server.key}
-                          onClick={() => { void onToggleEnabled(server, server.enabled === false) }}
-                        >
-                          {server.enabled === false ? t('enable') : t('disable')}
-                        </button>
-                        <button
-                          type="button"
-                          className={css.danger}
-                          disabled={busy === server.key}
-                          onClick={() => { void onRemove(server) }}
-                        >
-                          {t('remove')}
-                        </button>
-                      </>
-                    ) : null}
-                  </td>
-                </tr>
+                <ServerRow
+                  key={server.key}
+                  server={server}
+                  status={status}
+                  fullPath={fullPath}
+                  isExpanded={isExpanded}
+                  busy={busy === server.key}
+                  onToggleExpand={() => { setExpanded(isExpanded ? null : server.key) }}
+                  onToggleEnabled={(enabled) => { void onToggleEnabled(server, enabled) }}
+                  onRemove={() => { void onRemove(server) }}
+                  t={t}
+                />
               )
             })}
           </tbody>
         </table>
       ) : null}
     </div>
+  )
+}
+
+/** One server row + its expandable detail panel. */
+function ServerRow({ server, status, fullPath, isExpanded, busy, onToggleExpand, onToggleEnabled, onRemove, t }: {
+  server: McpServerState
+  status: DisplayStatus
+  fullPath: string | undefined
+  isExpanded: boolean
+  busy: boolean
+  onToggleExpand: () => void
+  onToggleEnabled: (enabled: boolean) => void
+  onRemove: () => void
+  t: (key: McpLocaleKey) => string
+}): ReactNode {
+  return (
+    <>
+      <tr
+        className={`${css.serverRow} ${isExpanded ? css.serverRowExpanded : ''}`}
+        data-source={server.source}
+        onClick={onToggleExpand}
+      >
+        <td className={css.nameCell} title={server.name}>{server.name}</td>
+        <td className={css.nowrapCell} title={server.transport}>{server.transport}</td>
+        <td className={css.nowrapCell}>
+          <span
+            className={css.statusBadge}
+            data-status={status}
+            title={
+              status === 'connected' ? t('connectedHint')
+                : status === 'registered' ? t('activeHint')
+                : undefined
+            }
+          >
+            {t(DISPLAY_KEYS[status])}
+          </span>
+        </td>
+      </tr>
+      {isExpanded ? (
+        <tr className={css.detailRow} data-source={server.source}>
+          <td colSpan={3}>
+            <div className={css.detailPanel}>
+              {/* Info section */}
+              <div className={css.detailGrid}>
+                <span className={css.detailLabel}>{t('detailSource')}</span>
+                <span className={css.detailValue}>{server.source === 'workspace' ? t('detailSourceWorkspace') : t('detailSourceProfile')}</span>
+
+                {fullPath !== undefined ? (
+                  <>
+                    <span className={css.detailLabel}>{server.source === 'workspace' ? t('detailWorkspace') : t('detailSourceFile')}</span>
+                    <span className={css.detailValue + ' ' + css.detailMono}>{fullPath}</span>
+                  </>
+                ) : null}
+
+                {server.error !== undefined ? (
+                  <>
+                    <span className={css.detailLabel}>{t('detailError')}</span>
+                    <span className={css.detailValue + ' ' + css.detailErrorValue}>{server.error}</span>
+                  </>
+                ) : null}
+
+                {status === 'registered' && server.probeError !== undefined ? (
+                  <>
+                    <span className={css.detailLabel}>{t('detailProbeError')}</span>
+                    <span className={css.detailValue + ' ' + css.detailErrorValue}>{server.probeError}</span>
+                  </>
+                ) : null}
+              </div>
+
+              {/* Actions */}
+              {server.source === 'workspace' ? (
+                <div className={css.detailActions}>
+                  <button
+                    type="button"
+                    className={css.toggle}
+                    disabled={busy}
+                    onClick={(e) => { e.stopPropagation(); onToggleEnabled(server.enabled === false) }}
+                  >
+                    {server.enabled === false ? t('enable') : t('disable')}
+                  </button>
+                  <button
+                    type="button"
+                    className={css.danger}
+                    disabled={busy}
+                    onClick={(e) => { e.stopPropagation(); onRemove() }}
+                  >
+                    {t('remove')}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </td>
+        </tr>
+      ) : null}
+    </>
   )
 }
