@@ -172,7 +172,7 @@ export function McpSettingsTab({
     setBusy(null)
     setState({ status: 'loading' })
     setRequest(value => value + 1)
-    setNotice(result.ok ? (enabled ? t('enabled') : t('disabled')) : `${t('applyFailed')}: ${result.error}`)
+    setNotice(result.ok ? (enabled ? t('started') : t('stopped')) : `${t('applyFailed')}: ${result.error}`)
   }
 
   const onToggleStrict = async (enabled: boolean): Promise<void> => {
@@ -466,7 +466,7 @@ function ServerRow({ server, status, fullPath, isExpanded, busy, onToggleExpand,
                     disabled={busy}
                     onClick={(e) => { e.stopPropagation(); onToggleEnabled(server.enabled === false) }}
                   >
-                    {server.enabled === false ? t('enable') : t('disable')}
+                    {server.enabled === false ? t('start') : t('stop')}
                   </button>
                   <button
                     type="button"

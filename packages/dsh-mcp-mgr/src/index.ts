@@ -339,8 +339,8 @@ export class McpMgrGateway extends TypertRemoteService {
   }
 
   /**
-   * Enable or disable one server entry in a workspace's mcp.json. Disabling
-   * writes `enabled: false`; enabling removes the field (absent = enabled).
+   * Start or stop one server entry in a workspace's mcp.json. Starting
+   * writes `enabled: true`; stopping removes the field (absent = stopped).
    * Resolves only after the resync settles, so the caller's follow-up
    * snapshot already reflects the mounted/unmounted state.
    */
@@ -369,9 +369,9 @@ export class McpMgrGateway extends TypertRemoteService {
       }
       const entryRecord = entry as Record<string, unknown>
       if (enabled) {
-        delete entryRecord.enabled
+        entryRecord.enabled = true
       } else {
-        entryRecord.enabled = false
+        delete entryRecord.enabled
       }
       atomicWriteJson(path, document)
     } catch (error) {

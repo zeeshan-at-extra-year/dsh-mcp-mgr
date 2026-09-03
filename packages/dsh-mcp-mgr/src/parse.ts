@@ -13,7 +13,7 @@ import type { Config as McpClientConfig } from '@deepseek-ai/dsh-mcp-client'
 /** One successfully mapped server. */
 export interface ParsedServer {
   readonly name: string
-  /** Whether the entry is enabled (`enabled: false` disables; absent/other = enabled). */
+  /** Whether the entry is enabled (`enabled: true` starts; absent/other = stopped). */
   readonly enabled: boolean
   readonly config: McpClientConfig
 }
@@ -101,7 +101,7 @@ export function parseMcpJson(text: string, workspacePath: string): ParseResult {
       errors.push({ name, message: 'entry must be an object' })
       continue
     }
-    const enabled = rawEntry.enabled !== false
+    const enabled = rawEntry.enabled === true
     // Missing type is the documented HTTP shorthand; reject unknown types
     // instead of silently treating a typo as stdio.
     const rawType = rawEntry.type
