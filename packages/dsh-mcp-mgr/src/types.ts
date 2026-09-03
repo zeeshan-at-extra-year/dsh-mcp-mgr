@@ -64,6 +64,8 @@ export interface McpServerState {
   readonly lastError?: string
   /** For stdio: the child process PID. */
   readonly pid?: number
+  /** Absolute path to the server's event log file (workspace rows only). */
+  readonly logFilePath?: string
 }
 
 /** Self-update check result served to the UI; '' means the value is unknown. */

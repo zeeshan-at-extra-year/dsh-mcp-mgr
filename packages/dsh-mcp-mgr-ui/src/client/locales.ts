@@ -79,6 +79,8 @@ export const zh = {
   detailReconnect: '重连尝试',
   detailNextRetry: '下次重试',
   detailLastError: '最近错误',
+  viewLog: '查看日志',
+  logEmpty: '暂无日志',
 } satisfies Record<string, string>
 
 /** MCP manager locale key union. */
@@ -168,4 +170,6 @@ export const en: Record<McpLocaleKey, string> = {
   detailReconnect: 'Reconnect attempts',
   detailNextRetry: 'next retry at',
   detailLastError: 'Last error',
+  viewLog: 'View Log',
+  logEmpty: 'No log entries yet',
 }

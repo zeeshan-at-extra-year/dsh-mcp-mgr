@@ -6,3 +6,6 @@ spike/
 .dsh/
 .DS_Store
 .pnpm-store/
+TEST_HANDOFF.md
+HANDOFF.md
+scripts/

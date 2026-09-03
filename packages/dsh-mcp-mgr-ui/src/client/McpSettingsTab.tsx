@@ -37,6 +37,8 @@ export interface McpSettingsTabInjected {
   setStrictMode: (enabled: boolean) => Promise<McpManagerSnapshot>
   /** Change the relative path of the mcp.json file inside each workspace. */
   setMcpJsonRelPath: (relPath: string) => Promise<McpManagerSnapshot>
+  /** Read a server's event log content. */
+  readServerLog: (workspace: string, serverName: string) => Promise<string>
   /** Self-update check result (startup npm lookup). */
   versionInfo: () => Promise<McpPluginVersionInfo>
   /** Registered workspaces for the add-form target picker. */
@@ -81,7 +83,7 @@ function displayStatus(server: McpServerState): DisplayStatus {
 
 /** Render the currently registered MCP servers (workspace + profile sources). */
 export function McpSettingsTab({
-  snapshot, apply, removeServer, setServerEnabled, setStrictMode, setMcpJsonRelPath, versionInfo, listWorkspaces, currentWorkspacePath, t,
+  snapshot, apply, removeServer, setServerEnabled, setStrictMode, setMcpJsonRelPath, readServerLog, versionInfo, listWorkspaces, currentWorkspacePath, t,
 }: McpSettingsTabProps): ReactNode {
   const [request, setRequest] = useState(0)
   const [state, setState] = useState<ViewState>({ status: 'loading' })
@@ -307,6 +309,18 @@ export function McpSettingsTab({
                   onToggleExpand={() => { setExpanded(isExpanded ? null : server.key) }}
                   onToggleEnabled={(enabled) => { void onToggleEnabled(server, enabled) }}
                   onRemove={() => { void onRemove(server) }}
+                  onViewLog={server.source === 'workspace' && server.workspace !== undefined
+                    ? async () => {
+                      const content = await readServerLog(server.workspace!, server.name)
+                      if (content.length === 0) {
+                        setNotice(t('logEmpty'))
+                        return
+                      }
+                      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+                      const url = URL.createObjectURL(blob)
+                      window.open(url, '_blank')
+                    }
+                    : undefined}
                   t={t}
                 />
               )
@@ -319,7 +333,7 @@ export function McpSettingsTab({
 }
 
 /** One server row + its expandable detail panel. */
-function ServerRow({ server, status, fullPath, isExpanded, busy, onToggleExpand, onToggleEnabled, onRemove, t }: {
+function ServerRow({ server, status, fullPath, isExpanded, busy, onToggleExpand, onToggleEnabled, onRemove, onViewLog, t }: {
   server: McpServerState
   status: DisplayStatus
   fullPath: string | undefined
@@ -328,6 +342,7 @@ function ServerRow({ server, status, fullPath, isExpanded, busy, onToggleExpand,
   onToggleExpand: () => void
   onToggleEnabled: (enabled: boolean) => void
   onRemove: () => void
+  onViewLog: (() => void) | undefined
   t: (key: McpLocaleKey) => string
 }): ReactNode {
   return (
@@ -427,6 +442,15 @@ function ServerRow({ server, status, fullPath, isExpanded, busy, onToggleExpand,
               {/* Actions */}
               {server.source === 'workspace' ? (
                 <div className={css.detailActions}>
+                  {onViewLog !== undefined ? (
+                    <button
+                      type="button"
+                      className={css.toggle}
+                      onClick={(e) => { e.stopPropagation(); void onViewLog() }}
+                    >
+                      {t('viewLog')}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className={css.toggle}

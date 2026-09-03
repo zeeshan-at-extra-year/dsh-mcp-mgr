@@ -26,11 +26,13 @@ import { createFileWatcher } from './watch.ts'
 import { checkPluginVersion } from './version.ts'
 import type { McpApplyResult, McpManagerSnapshot, McpPluginVersionInfo, McpServerDraft, McpServerState } from './types.ts'
 import type { McpClientStateSnapshot } from './sync.ts'
+import { ServerLogWriter } from './server-log.ts'
 
 export type * from './types.ts'
 export { parseMcpJson, mcpJsonPath, expandEnv, DEFAULT_MCP_JSON_REL_PATH } from './parse.ts'
 export { McpSync } from './sync.ts'
 export type { McpInstance, InstanceFactory, McpClientStateSnapshot } from './sync.ts'
+export { ServerLogWriter } from './server-log.ts'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'mcp-mgr'
@@ -94,7 +96,7 @@ export class McpMgrGateway extends TypertRemoteService {
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'mcpMgr')
-    this.mcpJsonRelPath = config.mcpJsonRelPath
+    this.mcpJsonRelPath = config.mcpJsonRelPath ?? DEFAULT_MCP_JSON_REL_PATH
     this.sync = new McpSync(
       {
         create: async config => {
@@ -126,6 +128,7 @@ export class McpMgrGateway extends TypertRemoteService {
         dispose: fiber => (fiber as { dispose(): Promise<void> }).dispose(),
       },
       { onChange: () => this.emitChange() },
+      workspacePath => new ServerLogWriter(workspacePath, this.mcpJsonRelPath),
     )
     // Forward mcp-client connection state events to the sync layer so the
     // UI sees live phase/PID/reconnect info without polling.
@@ -223,6 +226,23 @@ export class McpMgrGateway extends TypertRemoteService {
     this.parseCache.clear()
     await this.runRescan()
     return this.snapshot()
+  }
+
+  /**
+   * Read a server's event log content. Returns the full log text (may be
+   * large); empty string when no log exists.
+   * @param workspace - workspace path owning the server.
+   * @param serverName - server name.
+   */
+  @Remote('readServerLog')
+  readServerLog(workspace: string, serverName: string): string {
+    if (!SERVER_NAME_PATTERN.test(serverName)) {
+      throw new Error(`invalid serverName: ${serverName}`)
+    }
+    const workspacePath = this.resolveRegisteredWorkspace(workspace)
+    if (workspacePath === undefined) throw new Error(`workspace is not registered: ${workspace}`)
+    const logger = new ServerLogWriter(workspacePath, this.mcpJsonRelPath)
+    return logger.read(serverName)
   }
 
   /**

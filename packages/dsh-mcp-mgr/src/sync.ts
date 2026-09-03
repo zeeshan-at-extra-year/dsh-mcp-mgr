@@ -56,6 +56,12 @@ export interface InstanceFactory {
   dispose(fiber: unknown): Promise<void>
 }
 
+/** Per-server log writer contract. */
+export interface ServerLogger {
+  append(serverName: string, message: string): void
+  path(serverName: string): string
+}
+
 export interface SyncEvents {
   /** One or more instances changed; fires after a settled sync pass. */
   onChange(): void
@@ -79,10 +85,26 @@ export class McpSync {
   private syncing: Promise<void> = Promise.resolve()
   /** serverNames live outside this sync (profile-level instances). */
   private reserved = new Set<string>()
+  /** Per-workspace log writers; key = workspacePath. */
+  private readonly loggers = new Map<string, ServerLogger>()
+  /** Factory for creating workspace-scoped log writers. */
+  private readonly loggerFactory: ((workspacePath: string) => ServerLogger) | undefined
 
-  constructor(factory: InstanceFactory, events: SyncEvents) {
+  constructor(factory: InstanceFactory, events: SyncEvents, loggerFactory?: (workspacePath: string) => ServerLogger) {
     this.factory = factory
     this.events = events
+    this.loggerFactory = loggerFactory
+  }
+
+  /** Get or create a logger for a workspace. */
+  private logger(workspacePath: string): ServerLogger | undefined {
+    if (this.loggerFactory === undefined) return undefined
+    let logger = this.loggers.get(workspacePath)
+    if (logger === undefined) {
+      logger = this.loggerFactory(workspacePath)
+      this.loggers.set(workspacePath, logger)
+    }
+    return logger
   }
 
   /**
@@ -170,8 +192,20 @@ export class McpSync {
     let changed = false
     for (const instance of this.instances.values()) {
       if (instance.name !== serverName) continue
+      const prev = instance.clientState
       instance.clientState = state
       changed = true
+      // Log phase transitions and errors.
+      const log = this.logger(instance.workspacePath)
+      if (log !== undefined) {
+        if (prev === undefined || prev.phase !== state.phase) {
+          let detail = `phase: ${state.phase}`
+          if (state.pid !== undefined) detail += ` (pid=${state.pid})`
+          if (state.lastError !== undefined) detail += ` error="${state.lastError}"`
+          if (state.failedAttempts > 0) detail += ` attempts=${state.failedAttempts}/${state.maxAttempts}`
+          log.append(serverName, detail)
+        }
+      }
     }
     if (changed) this.events.onChange()
     return changed
@@ -184,6 +218,7 @@ export class McpSync {
         left.workspacePath.localeCompare(right.workspacePath) || left.name.localeCompare(right.name))
       .map(instance => {
         const cs = instance.clientState
+        const log = this.logger(instance.workspacePath)
         return {
           key: instance.key,
           source: 'workspace' as const,
@@ -195,6 +230,7 @@ export class McpSync {
           ...(instance.connected === undefined ? {} : { connected: instance.connected }),
           ...(instance.probeError === undefined ? {} : { probeError: instance.probeError }),
           ...(instance.error === undefined ? {} : { error: instance.error }),
+          ...(log === undefined ? {} : { logFilePath: log.path(instance.name) }),
           ...(cs === undefined ? {} : {
             clientPhase: cs.phase,
             failedAttempts: cs.failedAttempts,
@@ -270,28 +306,36 @@ export class McpSync {
     }
     this.instances.set(key, instance)
     this.ownerByServerName.set(name, key)
+    const log = this.logger(workspacePath)
+    log?.append(name, `connecting (transport=${config.transport})`)
     try {
       const created = await this.factory.create(config)
       instance.fiber = created.fiber
       if (created.connected !== undefined) instance.connected = created.connected
       if (created.probeError !== undefined) instance.probeError = created.probeError
       instance.status = 'active'
+      log?.append(name, `active (connected=${String(instance.connected ?? 'unknown')}${instance.probeError !== undefined ? `, probeError=${instance.probeError}` : ''})`)
     } catch (error) {
       instance.status = 'error'
       instance.error = String(error instanceof Error ? error.message : error)
       this.ownerByServerName.delete(name)
+      log?.append(name, `error: ${instance.error}`)
     }
   }
 
   private async removeInstance(instance: McpInstance): Promise<void> {
     instance.status = 'removing'
+    const log = this.logger(instance.workspacePath)
+    log?.append(instance.name, 'removing')
     try {
       if (instance.fiber !== undefined) await this.factory.dispose(instance.fiber)
     } catch (error) {
       instance.error = `dispose failed: ${String(error instanceof Error ? error.message : error)}`
       instance.status = 'error'
+      log?.append(instance.name, `dispose error: ${instance.error}`)
       return
     }
+    log?.append(instance.name, 'removed')
     this.instances.delete(instance.key)
     if (this.ownerByServerName.get(instance.name) === instance.key) {
       this.ownerByServerName.delete(instance.name)

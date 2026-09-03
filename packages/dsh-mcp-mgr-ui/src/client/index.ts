@@ -36,6 +36,7 @@ interface McpMgrNamespace {
   setStrictMode(enabled: boolean): Promise<RemoteResult<McpManagerSnapshot>>
   setActiveWorkspace(path: string): Promise<RemoteResult<McpManagerSnapshot>>
   setMcpJsonRelPath(relPath: string): Promise<RemoteResult<McpManagerSnapshot>>
+  readServerLog(workspace: string, serverName: string): Promise<RemoteResult<string>>
   versionInfo(): Promise<RemoteResult<McpPluginVersionInfo>>
 }
 
@@ -146,6 +147,13 @@ export async function apply(ctx: ClientContext): Promise<void> {
       const result = await mcpMgr().setMcpJsonRelPath(relPath)
       if (!result.ok) {
         throw new Error(`mcpMgr.setMcpJsonRelPath failed: ${result.error.code}: ${result.error.message}`)
+      }
+      return result.value
+    },
+    readServerLog: async (workspace, serverName) => {
+      const result = await mcpMgr().readServerLog(workspace, serverName)
+      if (!result.ok) {
+        throw new Error(`mcpMgr.readServerLog failed: ${result.error.code}: ${result.error.message}`)
       }
       return result.value
     },
