@@ -8,4 +8,6 @@ spike/
 .pnpm-store/
 TEST_HANDOFF.md
 HANDOFF.md
+UPSTREAM_STDERR_HANDOFF.md
+UPSTREAM_DONE_HANDOFF.md
 scripts/

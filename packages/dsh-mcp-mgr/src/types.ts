@@ -64,6 +64,8 @@ export interface McpServerState {
   readonly lastError?: string
   /** For stdio: the child process PID. */
   readonly pid?: number
+  /** For stdio: trailing stderr output from the child process. */
+  readonly stderrTail?: string
   /** Absolute path to the server's event log file (workspace rows only). */
   readonly logFilePath?: string
 }

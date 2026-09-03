@@ -79,6 +79,7 @@ export const zh = {
   detailReconnect: '重连尝试',
   detailNextRetry: '下次重试',
   detailLastError: '最近错误',
+  detailStderr: '进程 stderr',
   viewLog: '查看日志',
   logEmpty: '暂无日志',
 } satisfies Record<string, string>
@@ -170,6 +171,7 @@ export const en: Record<McpLocaleKey, string> = {
   detailReconnect: 'Reconnect attempts',
   detailNextRetry: 'next retry at',
   detailLastError: 'Last error',
+  detailStderr: 'Process stderr',
   viewLog: 'View Log',
   logEmpty: 'No log entries yet',
 }

@@ -437,6 +437,15 @@ function ServerRow({ server, status, fullPath, isExpanded, busy, onToggleExpand,
                     <span className={css.detailValue + ' ' + css.detailErrorValue}>{server.probeError}</span>
                   </>
                 ) : null}
+
+                {server.stderrTail !== undefined ? (
+                  <>
+                    <span className={css.detailLabel}>{t('detailStderr')}</span>
+                    <pre className={css.detailValue + ' ' + css.detailMono + ' ' + css.detailStderr}>
+                      {server.stderrTail}
+                    </pre>
+                  </>
+                ) : null}
               </div>
 
               {/* Actions */}

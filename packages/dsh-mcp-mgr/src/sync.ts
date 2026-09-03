@@ -22,6 +22,7 @@ export interface McpClientStateSnapshot {
   nextReconnectAt?: number
   lastError?: string
   pid?: number
+  stderrTail?: string
 }
 
 /** One live or desired instance slot keyed by workspace + serverName. */
@@ -203,6 +204,7 @@ export class McpSync {
           if (state.pid !== undefined) detail += ` (pid=${state.pid})`
           if (state.lastError !== undefined) detail += ` error="${state.lastError}"`
           if (state.failedAttempts > 0) detail += ` attempts=${state.failedAttempts}/${state.maxAttempts}`
+          if (state.stderrTail !== undefined) detail += `\nstderr:\n${state.stderrTail}`
           log.append(serverName, detail)
         }
       }
@@ -239,6 +241,7 @@ export class McpSync {
             ...(cs.nextReconnectAt === undefined ? {} : { nextReconnectAt: cs.nextReconnectAt }),
             ...(cs.lastError === undefined ? {} : { lastError: cs.lastError }),
             ...(cs.pid === undefined ? {} : { pid: cs.pid }),
+            ...(cs.stderrTail === undefined ? {} : { stderrTail: cs.stderrTail }),
           }),
         }
       })
