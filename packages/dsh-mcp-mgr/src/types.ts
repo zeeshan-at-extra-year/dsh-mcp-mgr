@@ -16,6 +16,15 @@ export type McpServerStatus =
   | 'configured'
   | 'disabled'
 
+/** Connection lifecycle phase from dsh-mcp-client state events. */
+export type McpClientPhase =
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'backoff'
+  | 'exhausted'
+  | 'disposed'
+
 /** One dynamically registered MCP server as seen by the UI. */
 export interface McpServerState {
   /** Stable instance key: `<workspacePath>#<serverName>` for workspace rows, `profile#<entryId>` for profile rows. */
@@ -41,6 +50,20 @@ export interface McpServerState {
   readonly workspace?: string
   /** Profile source only: config file declaring the entry. */
   readonly sourceFile?: string
+  /** Connection supervisor phase from dsh-mcp-client state events. */
+  readonly clientPhase?: McpClientPhase
+  /** Consecutive failed connection attempts within the current outage. */
+  readonly failedAttempts?: number
+  /** Max reconnect attempts before giving up. */
+  readonly maxAttempts?: number
+  /** Timestamp (ms) when the current generation connected. */
+  readonly connectedAt?: number
+  /** Timestamp (ms) of the next scheduled reconnect attempt. */
+  readonly nextReconnectAt?: number
+  /** Error from the latest failed connection attempt. */
+  readonly lastError?: string
+  /** For stdio: the child process PID. */
+  readonly pid?: number
 }
 
 /** Self-update check result served to the UI; '' means the value is unknown. */

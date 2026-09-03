@@ -369,10 +369,50 @@ function ServerRow({ server, status, fullPath, isExpanded, busy, onToggleExpand,
                   </>
                 ) : null}
 
+                {server.clientPhase !== undefined ? (
+                  <>
+                    <span className={css.detailLabel}>{t('detailPhase')}</span>
+                    <span className={css.detailValue}>{server.clientPhase}</span>
+                  </>
+                ) : null}
+
+                {server.pid !== undefined ? (
+                  <>
+                    <span className={css.detailLabel}>{t('detailPid')}</span>
+                    <span className={css.detailValue + ' ' + css.detailMono}>{server.pid}</span>
+                  </>
+                ) : null}
+
+                {server.connectedAt !== undefined ? (
+                  <>
+                    <span className={css.detailLabel}>{t('detailConnectedAt')}</span>
+                    <span className={css.detailValue}>{new Date(server.connectedAt).toLocaleTimeString()}</span>
+                  </>
+                ) : null}
+
+                {server.failedAttempts !== undefined && server.failedAttempts > 0 ? (
+                  <>
+                    <span className={css.detailLabel}>{t('detailReconnect')}</span>
+                    <span className={css.detailValue + ' ' + css.detailErrorValue}>
+                      {server.failedAttempts}/{server.maxAttempts}
+                      {server.nextReconnectAt !== undefined
+                        ? ` — ${t('detailNextRetry')} ${new Date(server.nextReconnectAt).toLocaleTimeString()}`
+                        : null}
+                    </span>
+                  </>
+                ) : null}
+
                 {server.error !== undefined ? (
                   <>
                     <span className={css.detailLabel}>{t('detailError')}</span>
                     <span className={css.detailValue + ' ' + css.detailErrorValue}>{server.error}</span>
+                  </>
+                ) : null}
+
+                {server.lastError !== undefined ? (
+                  <>
+                    <span className={css.detailLabel}>{t('detailLastError')}</span>
+                    <span className={css.detailValue + ' ' + css.detailErrorValue}>{server.lastError}</span>
                   </>
                 ) : null}
 

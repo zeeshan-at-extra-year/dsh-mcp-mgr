@@ -25,11 +25,12 @@ import { McpSync } from './sync.ts'
 import { createFileWatcher } from './watch.ts'
 import { checkPluginVersion } from './version.ts'
 import type { McpApplyResult, McpManagerSnapshot, McpPluginVersionInfo, McpServerDraft, McpServerState } from './types.ts'
+import type { McpClientStateSnapshot } from './sync.ts'
 
 export type * from './types.ts'
 export { parseMcpJson, mcpJsonPath, expandEnv, DEFAULT_MCP_JSON_REL_PATH } from './parse.ts'
 export { McpSync } from './sync.ts'
-export type { McpInstance, InstanceFactory } from './sync.ts'
+export type { McpInstance, InstanceFactory, McpClientStateSnapshot } from './sync.ts'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'mcp-mgr'
@@ -126,6 +127,16 @@ export class McpMgrGateway extends TypertRemoteService {
       },
       { onChange: () => this.emitChange() },
     )
+    // Forward mcp-client connection state events to the sync layer so the
+    // UI sees live phase/PID/reconnect info without polling.
+    // The event is declaration-merged by dsh-mcp-client's state.ts; when the
+    // host ships a version without the merge, the listener is simply never called.
+    ;(ctx as { on(event: string, handler: (...args: unknown[]) => void): void })
+      .on('mcp-client/state', (...args: unknown[]) => {
+        const serverName = args[0] as string
+        const state = args[1] as McpClientStateSnapshot
+        this.sync.applyClientState(serverName, state)
+      })
     this.rescanTimer = setInterval(() => {
       void this.runRescan()
     }, config.rescanIntervalMs)

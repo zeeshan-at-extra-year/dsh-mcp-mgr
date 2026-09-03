@@ -170,6 +170,13 @@ export function parseMcpJson(text: string, workspacePath: string): ParseResult {
         }
         Object.assign(headers, rawEntry.headers)
       }
+      // Optional OAuth auth config for Streamable HTTP servers.
+      const auth = isRecord(rawEntry.auth) ? {
+        clientMetadata: rawEntry.auth.clientMetadata as Record<string, unknown>,
+        ...(typeof rawEntry.auth.callbackPort === 'number' ? { callbackPort: rawEntry.auth.callbackPort } : {}),
+        ...(typeof rawEntry.auth.storageDir === 'string' ? { storageDir: rawEntry.auth.storageDir } : {}),
+      } : undefined
+
       servers.push({
         name,
         enabled,
@@ -180,6 +187,7 @@ export function parseMcpJson(text: string, workspacePath: string): ParseResult {
           headers,
           toolCallTimeoutMs: 60_000,
           failOnStartupError: false,
+          ...(auth !== undefined ? { auth } : {}),
         },
       })
     }

@@ -73,6 +73,12 @@ export const zh = {
   detailSourceFile: '配置文件',
   detailError: '错误',
   detailProbeError: '探测错误',
+  detailPhase: '连接阶段',
+  detailPid: '进程 PID',
+  detailConnectedAt: '连接时间',
+  detailReconnect: '重连尝试',
+  detailNextRetry: '下次重试',
+  detailLastError: '最近错误',
 } satisfies Record<string, string>
 
 /** MCP manager locale key union. */
@@ -156,4 +162,10 @@ export const en: Record<McpLocaleKey, string> = {
   detailSourceFile: 'Config file',
   detailError: 'Error',
   detailProbeError: 'Probe error',
+  detailPhase: 'Connection phase',
+  detailPid: 'Process PID',
+  detailConnectedAt: 'Connected at',
+  detailReconnect: 'Reconnect attempts',
+  detailNextRetry: 'next retry at',
+  detailLastError: 'Last error',
 }

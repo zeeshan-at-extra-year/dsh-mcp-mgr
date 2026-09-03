@@ -9,7 +9,20 @@
  */
 
 import type { Config as McpClientConfig } from '@deepseek-ai/dsh-mcp-client'
-import type { McpServerState, McpServerStatus } from './types.ts'
+import type { McpClientPhase, McpServerState, McpServerStatus } from './types.ts'
+
+/** Connection supervisor state snapshot from dsh-mcp-client events. */
+export interface McpClientStateSnapshot {
+  serverName: string
+  transport: 'stdio' | 'streamable-http'
+  phase: McpClientPhase
+  failedAttempts: number
+  maxAttempts: number
+  connectedAt?: number
+  nextReconnectAt?: number
+  lastError?: string
+  pid?: number
+}
 
 /** One live or desired instance slot keyed by workspace + serverName. */
 export interface McpInstance {
@@ -26,6 +39,8 @@ export interface McpInstance {
   connected?: boolean
   /** Reason the connectivity probe could not run/complete (shown on the row). */
   probeError?: string
+  /** Latest connection supervisor state from dsh-mcp-client events. */
+  clientState?: Readonly<McpClientStateSnapshot>
 }
 
 /** Factory contract: mount one mcp-client instance. */
@@ -146,23 +161,51 @@ export class McpSync {
     return changed
   }
 
+  /**
+   * Apply a connection supervisor state snapshot for one server.
+   * The serverName is matched against live instances; unmatched names are ignored.
+   * @returns whether any instance was updated.
+   */
+  applyClientState(serverName: string, state: Readonly<McpClientStateSnapshot>): boolean {
+    let changed = false
+    for (const instance of this.instances.values()) {
+      if (instance.name !== serverName) continue
+      instance.clientState = state
+      changed = true
+    }
+    if (changed) this.events.onChange()
+    return changed
+  }
+
   /** Current live instance projection, sorted by workspace then name. */
   snapshot(): McpServerState[] {
     return [...this.instances.values()]
       .sort((left, right) =>
         left.workspacePath.localeCompare(right.workspacePath) || left.name.localeCompare(right.name))
-      .map(instance => ({
-        key: instance.key,
-        source: 'workspace' as const,
-        workspace: instance.workspacePath,
-        name: instance.name,
-        enabled: instance.enabled,
-        transport: instance.config.transport,
-        status: instance.status,
-        ...(instance.connected === undefined ? {} : { connected: instance.connected }),
-        ...(instance.probeError === undefined ? {} : { probeError: instance.probeError }),
-        ...(instance.error === undefined ? {} : { error: instance.error }),
-      }))
+      .map(instance => {
+        const cs = instance.clientState
+        return {
+          key: instance.key,
+          source: 'workspace' as const,
+          workspace: instance.workspacePath,
+          name: instance.name,
+          enabled: instance.enabled,
+          transport: instance.config.transport,
+          status: instance.status,
+          ...(instance.connected === undefined ? {} : { connected: instance.connected }),
+          ...(instance.probeError === undefined ? {} : { probeError: instance.probeError }),
+          ...(instance.error === undefined ? {} : { error: instance.error }),
+          ...(cs === undefined ? {} : {
+            clientPhase: cs.phase,
+            failedAttempts: cs.failedAttempts,
+            maxAttempts: cs.maxAttempts,
+            ...(cs.connectedAt === undefined ? {} : { connectedAt: cs.connectedAt }),
+            ...(cs.nextReconnectAt === undefined ? {} : { nextReconnectAt: cs.nextReconnectAt }),
+            ...(cs.lastError === undefined ? {} : { lastError: cs.lastError }),
+            ...(cs.pid === undefined ? {} : { pid: cs.pid }),
+          }),
+        }
+      })
   }
 
   private async upsertInstance(workspacePath: string, name: string, enabled: boolean, config: McpClientConfig): Promise<void> {
