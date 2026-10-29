@@ -70,6 +70,8 @@ export const zh = {
   mcpJsonPathHint: '工作区内 mcp.json 的相对路径',
   mcpJsonPathSave: '应用',
   mcpJsonPathSaved: '配置文件路径已更新',
+  mcpJsonPathSavedWithServers: '配置文件路径已更新，发现 {count} 个 MCP 服务',
+  mcpJsonPathSavedNoServers: '配置文件路径已更新，未发现 MCP 服务',
   detailSource: '来源',
   detailSourceWorkspace: '工作区',
   detailSourceProfile: 'Profile 配置',
@@ -86,6 +88,10 @@ export const zh = {
   detailStderr: '进程 stderr',
   viewLog: '查看日志',
   logEmpty: '暂无日志',
+  scopeGlobal: '全局',
+  scopeLabel: '工作区范围',
+  scopeConfigPath: '配置文件',
+  scopeNoServers: '该范围下暂无 MCP 服务。',
 } satisfies Record<string, string>
 
 /** MCP manager locale key union. */
@@ -166,6 +172,8 @@ export const en: Record<McpLocaleKey, string> = {
   mcpJsonPathHint: 'Relative path of the mcp.json inside each workspace',
   mcpJsonPathSave: 'Apply',
   mcpJsonPathSaved: 'Config file path updated',
+  mcpJsonPathSavedWithServers: 'Config file path updated, discovered {count} MCP server(s)',
+  mcpJsonPathSavedNoServers: 'Config file path updated, no MCP servers found',
   detailSource: 'Source',
   detailSourceWorkspace: 'Workspace',
   detailSourceProfile: 'Profile config',
@@ -182,4 +190,8 @@ export const en: Record<McpLocaleKey, string> = {
   detailStderr: 'Process stderr',
   viewLog: 'View Log',
   logEmpty: 'No log entries yet',
+  scopeGlobal: 'Global',
+  scopeLabel: 'Workspace scope',
+  scopeConfigPath: 'Config file',
+  scopeNoServers: 'No MCP servers in this scope.',
 }

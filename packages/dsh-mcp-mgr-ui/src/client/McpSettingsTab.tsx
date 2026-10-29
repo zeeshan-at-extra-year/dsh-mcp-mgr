@@ -10,6 +10,12 @@ import css from './McpSettingsTab.module.css'
 /** localStorage key for the strict-mode checkbox. */
 export const STRICT_MODE_KEY = 'dsh.mcpMgr.strictMode'
 
+/** localStorage key for the last selected workspace scope. */
+const SCOPE_KEY = 'dsh.mcpMgr.scope'
+
+/** Sentinel value for the "Global" scope (profile-level servers). */
+const SCOPE_GLOBAL = '__global__'
+
 /** Persisted strict-mode preference; null when never set (host default applies). */
 export function loadStrictMode(): boolean | null {
   const stored = localStorage.getItem(STRICT_MODE_KEY)
@@ -97,6 +103,26 @@ export function McpSettingsTab({
   const [pathSaving, setPathSaving] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
 
+  // Workspace scope selector: SCOPE_GLOBAL or a workspace path.
+  const [selectedScope, setSelectedScope] = useState<string>(() => {
+    return localStorage.getItem(SCOPE_KEY) ?? SCOPE_GLOBAL
+  })
+
+  const workspaces = listWorkspaces()
+
+  // Persist scope choice; fall back to global when the stored workspace no longer exists.
+  const effectiveScope = useMemo(() => {
+    if (selectedScope === SCOPE_GLOBAL) return SCOPE_GLOBAL
+    if (workspaces.some(ws => ws.path === selectedScope)) return selectedScope
+    return SCOPE_GLOBAL
+  }, [selectedScope, workspaces])
+
+  const onScopeChange = (value: string): void => {
+    setSelectedScope(value)
+    localStorage.setItem(SCOPE_KEY, value)
+    setExpanded(null)
+  }
+
   useEffect(() => {
     let current = true
     void versionInfo().then(
@@ -120,10 +146,14 @@ export function McpSettingsTab({
     return () => { current = false }
   }, [snapshot, request])
 
-  const servers = useMemo(
-    () => state.status === 'ready' ? state.snapshot.servers : [],
-    [state],
-  )
+  // Filter servers by the selected scope.
+  const scopedServers = useMemo(() => {
+    const all = state.status === 'ready' ? state.snapshot.servers : []
+    if (effectiveScope === SCOPE_GLOBAL) {
+      return all.filter(s => s.source === 'profile')
+    }
+    return all.filter(s => s.source === 'workspace' && s.workspace === effectiveScope)
+  }, [state, effectiveScope])
 
   const retry = (): void => {
     setNotice(null)
@@ -197,7 +227,10 @@ export function McpSettingsTab({
       const snap = await setMcpJsonRelPath(trimmed)
       setState({ status: 'ready', snapshot: snap })
       setPathInput(snap.mcpJsonRelPath)
-      setNotice(t('mcpJsonPathSaved'))
+      const workspaceServerCount = snap.servers.filter(s => s.source === 'workspace').length
+      setNotice(workspaceServerCount > 0
+        ? t('mcpJsonPathSavedWithServers').replace('{count}', String(workspaceServerCount))
+        : t('mcpJsonPathSavedNoServers'))
     } catch (error) {
       setNotice(`${t('applyFailed')}: ${String(error instanceof Error ? error.message : error)}`)
     } finally {
@@ -207,6 +240,16 @@ export function McpSettingsTab({
 
   const currentRelPath = state.status === 'ready' ? state.snapshot.mcpJsonRelPath : ''
   const pathDirty = pathInput.trim() !== '' && pathInput.trim() !== currentRelPath
+
+  // Resolved config file path for the selected workspace scope.
+  const scopeConfigFile = useMemo(() => {
+    if (effectiveScope === SCOPE_GLOBAL || currentRelPath === '') return undefined
+    return `${effectiveScope}/${currentRelPath}`
+  }, [effectiveScope, currentRelPath])
+
+  // Default workspace for the add-form: use the scoped workspace when viewing
+  // a workspace scope; otherwise fall back to the current session workspace.
+  const addFormDefaultWorkspace = effectiveScope !== SCOPE_GLOBAL ? effectiveScope : currentWorkspacePath()
 
   return (
     <div className={css.section} aria-busy={state.status === 'loading'}>
@@ -220,6 +263,30 @@ export function McpSettingsTab({
           {t('updateAvailableLink')}
         </div>
       ) : null}
+
+      {/* Workspace scope selector */}
+      <div className={css.scopeRow}>
+        <label className={css.scopeLabel}>{t('scopeLabel')}</label>
+        <select
+          className={css.scopeSelect}
+          value={effectiveScope}
+          onChange={(e) => { onScopeChange(e.target.value) }}
+        >
+          <option value={SCOPE_GLOBAL}>{t('scopeGlobal')}</option>
+          {workspaces.map(ws => (
+            <option key={ws.path} value={ws.path}>{ws.title}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Per-workspace config file path info */}
+      {scopeConfigFile !== undefined ? (
+        <div className={css.scopeInfo}>
+          <span className={css.scopeInfoLabel}>{t('scopeConfigPath')}</span>
+          <code className={css.scopeInfoValue}>{scopeConfigFile}</code>
+        </div>
+      ) : null}
+
       <div className={css.pathRow}>
         <label className={css.pathLabel} title={t('mcpJsonPathHint')}>
           {t('mcpJsonPathLabel')}
@@ -251,22 +318,24 @@ export function McpSettingsTab({
             />
             {t('strictMode')}
           </label>
-          <button
-            type="button"
-            className={css.add}
-            disabled={listWorkspaces().length === 0}
-            title={t('noWorkspace')}
-            onClick={() => { setShowForm(true) }}
-          >
-            {t('add')}
-          </button>
+          {effectiveScope !== SCOPE_GLOBAL ? (
+            <button
+              type="button"
+              className={css.add}
+              disabled={workspaces.length === 0}
+              title={workspaces.length === 0 ? t('noWorkspace') : undefined}
+              onClick={() => { setShowForm(true) }}
+            >
+              {t('add')}
+            </button>
+          ) : null}
           <button type="button" className={css.refresh} onClick={retry}>{t('refresh')}</button>
         </div>
       </div>
       {showForm ? (
         <McpServerForm
-          workspaces={listWorkspaces()}
-          defaultWorkspace={currentWorkspacePath()}
+          workspaces={workspaces}
+          defaultWorkspace={addFormDefaultWorkspace}
           submit={apply}
           t={t}
           onClose={() => { setShowForm(false) }}
@@ -281,10 +350,10 @@ export function McpSettingsTab({
           <button type="button" onClick={retry}>{t('retry')}</button>
         </div>
       ) : null}
-      {state.status === 'ready' && servers.length === 0
-        ? <p className={css.status}>{t('empty')}</p>
+      {state.status === 'ready' && scopedServers.length === 0
+        ? <p className={css.status}>{t('scopeNoServers')}</p>
         : null}
-      {servers.length > 0 ? (
+      {scopedServers.length > 0 ? (
         <table className={css.table}>
           <thead>
             <tr>
@@ -294,7 +363,7 @@ export function McpSettingsTab({
             </tr>
           </thead>
           <tbody>
-            {servers.map((server) => {
+            {scopedServers.map((server) => {
               const status = displayStatus(server)
               const isExpanded = expanded === server.key
               const fullPath = server.source === 'workspace' ? server.workspace : server.sourceFile
